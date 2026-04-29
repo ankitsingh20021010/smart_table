@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Smart Mirror — Food Court</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #111; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'DM Sans', sans-serif; }
+
+    .mirror-frame {
+      width: 380px; min-height: 720px;
+      background: #0a0a0f; border-radius: 32px;
+      border: 3px solid #2a2a3a;
+      position: relative; overflow: hidden;
+    }
+    .mirror-bg { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 20%, #0d1b3e 0%, #0a0a0f 70%); }
+    .mirror-reflection { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%, rgba(255,255,255,0.01) 100%); pointer-events: none; z-index: 10; }
+    .screen { position: relative; z-index: 5; padding: 28px 24px; min-height: 720px; }
+
+    .power-btn {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      width: 48px; height: 12px; background: rgba(255,255,255,0.06);
+      border-radius: 6px; border: 1px solid rgba(255,255,255,0.12);
+      cursor: pointer; z-index: 20; display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .power-btn:hover { background: rgba(255,255,255,0.12); }
+    .power-btn-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); }
+
+    .s { display: none; }
+    .s.active { display: block; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* IDLE */
+    .idle-content { text-align: center; padding-top: 120px; }
+    .idle-time { font-family: 'Orbitron', monospace; font-size: 48px; font-weight: 700; color: rgba(255,255,255,0.85); letter-spacing: 4px; margin-bottom: 4px; }
+    .idle-date { font-size: 13px; color: rgba(255,255,255,0.35); letter-spacing: 2px; margin-bottom: 80px; }
+    .idle-hint { font-size: 13px; color: rgba(255,255,255,0.25); letter-spacing: 1px; }
+    .touch-area { margin: 40px auto 0; width: 64px; height: 64px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; animation: pulse 2.5s infinite; }
+    .touch-area:hover { border-color: rgba(99,179,237,0.5); background: rgba(99,179,237,0.05); }
+    @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(99,179,237,0.2); } 50% { box-shadow: 0 0 0 12px rgba(99,179,237,0); } }
+    .touch-icon { font-size: 24px; opacity: 0.5; }
+
+    /* FORM */
+    .welcome-logo { text-align: center; padding-top: 40px; margin-bottom: 32px; }
+    .logo-text { font-family: 'Orbitron', monospace; font-size: 13px; letter-spacing: 4px; color: rgba(99,179,237,0.7); margin-bottom: 4px; }
+    .logo-sub { font-size: 11px; color: rgba(255,255,255,0.2); letter-spacing: 2px; }
+    .form-label { font-size: 11px; letter-spacing: 2px; color: rgba(255,255,255,0.35); margin-bottom: 8px; display: block; }
+    .mirror-input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 14px 16px; color: rgba(255,255,255,0.9); font-size: 15px; font-family: 'DM Sans', sans-serif; outline: none; margin-bottom: 16px; transition: border-color 0.2s; }
+    .mirror-input:focus { border-color: rgba(99,179,237,0.5); background: rgba(99,179,237,0.04); }
+    .mirror-input::placeholder { color: rgba(255,255,255,0.2); }
+    .mirror-btn { width: 100%; padding: 16px; border-radius: 12px; background: linear-gradient(135deg, #1a3a6e, #2563a8); border: none; color: white; font-size: 15px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; letter-spacing: 0.5px; transition: opacity 0.2s; margin-top: 8px; }
+    .mirror-btn:hover { opacity: 0.85; }
+    .mirror-btn.secondary { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); font-size: 13px; padding: 12px; margin-top: 8px; }
+
+    /* WELCOME */
+    .welcome-screen { text-align: center; padding-top: 80px; }
+    .welcome-emoji { font-size: 48px; margin-bottom: 20px; display: block; }
+    .welcome-msg { font-family: 'Orbitron', monospace; font-size: 12px; letter-spacing: 3px; color: rgba(99,179,237,0.6); margin-bottom: 8px; }
+    .welcome-name { font-size: 32px; font-weight: 500; color: rgba(255,255,255,0.9); margin-bottom: 8px; }
+    .welcome-table { font-size: 13px; color: rgba(255,255,255,0.3); letter-spacing: 1px; margin-bottom: 48px; }
+    .welcome-dots { display: flex; gap: 6px; justify-content: center; margin-top: 32px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.15); animation: dotPulse 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dotPulse { 0%,100% { background: rgba(255,255,255,0.15); } 50% { background: rgba(99,179,237,0.6); } }
+
+    /* RESTAURANTS */
+    .section-header { font-size: 10px; letter-spacing: 2px; color: rgba(255,255,255,0.25); margin: 20px 0 10px; text-transform: uppercase; }
+    .rest-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); cursor: pointer; margin-bottom: 8px; transition: all 0.2s; }
+    .rest-card:hover { background: rgba(99,179,237,0.08); border-color: rgba(99,179,237,0.2); }
+    .rest-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .rest-info { flex: 1; }
+    .rest-name { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85); }
+    .rest-tag { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; }
+    .rest-arrow { font-size: 16px; color: rgba(255,255,255,0.2); }
+    .screen-title { font-family: 'Orbitron', monospace; font-size: 11px; letter-spacing: 3px; color: rgba(99,179,237,0.5); margin-bottom: 4px; }
+    .screen-greeting { font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.85); margin-bottom: 20px; }
+
+    /* MENU */
+    .back-btn { display: flex; align-items: center; gap: 6px; color: rgba(99,179,237,0.6); font-size: 12px; cursor: pointer; margin-bottom: 16px; letter-spacing: 1px; }
+    .rest-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .rest-header-icon { width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+    .rest-header-name { font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.9); }
+    .rest-header-sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 2px; }
+    .menu-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .item-info { flex: 1; }
+    .item-name { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.8); }
+    .item-desc { font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+    .item-price { font-size: 14px; font-weight: 500; color: rgba(99,179,237,0.8); margin-right: 12px; }
+    .add-btn { width: 28px; height: 28px; border-radius: 8px; background: rgba(37,99,168,0.3); border: 1px solid rgba(37,99,168,0.4); color: rgba(99,179,237,0.9); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; line-height: 1; }
+    .add-btn:hover { background: rgba(37,99,168,0.6); }
+    .add-btn.added { background: rgba(37,99,168,0.7); }
+    .cart-bar { background: linear-gradient(135deg, #1a3a6e, #2563a8); border-radius: 14px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; margin-top: 16px; cursor: pointer; transition: opacity 0.2s; }
+    .cart-bar:hover { opacity: 0.9; }
+    .cart-info { font-size: 13px; color: rgba(255,255,255,0.8); }
+    .cart-total { font-size: 15px; font-weight: 500; color: white; }
+
+    /* CART */
+    .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .cart-item-name { font-size: 13px; color: rgba(255,255,255,0.75); }
+    .cart-item-price { font-size: 13px; color: rgba(99,179,237,0.8); font-weight: 500; }
+    .total-row { display: flex; justify-content: space-between; padding: 16px 0 0; }
+    .total-label { font-size: 13px; color: rgba(255,255,255,0.4); }
+    .total-amount { font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.9); }
+    .pay-btn { width: 100%; padding: 16px; border-radius: 12px; margin-top: 16px; background: linear-gradient(135deg, #1a5c3a, #22a05c); border: none; color: white; font-size: 15px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.2s; }
+    .pay-btn:hover { opacity: 0.85; }
+
+    /* CONFIRMED */
+    .confirmed-screen { text-align: center; padding-top: 60px; }
+    .check-circle { width: 80px; height: 80px; border-radius: 50%; background: rgba(34,160,92,0.15); border: 2px solid rgba(34,160,92,0.4); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 36px; }
+    .conf-title { font-family: 'Orbitron', monospace; font-size: 13px; letter-spacing: 3px; color: rgba(34,160,92,0.7); margin-bottom: 8px; }
+    .conf-sub { font-size: 22px; font-weight: 500; color: rgba(255,255,255,0.85); margin-bottom: 4px; }
+    .conf-table { font-size: 13px; color: rgba(255,255,255,0.3); margin-bottom: 32px; }
+    .timer-box { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+    .timer-label { font-size: 11px; letter-spacing: 2px; color: rgba(255,255,255,0.3); margin-bottom: 8px; }
+    .timer-val { font-family: 'Orbitron', monospace; font-size: 36px; font-weight: 700; color: rgba(255,255,255,0.85); }
+    .ready-badge { background: rgba(34,160,92,0.15); border: 1px solid rgba(34,160,92,0.3); border-radius: 10px; padding: 10px 16px; font-size: 13px; color: rgba(34,160,92,0.8); display: none; }
+    .ready-badge.show { display: block; animation: fadeIn 0.5s ease; }
+  </style>
+</head>
+<body>
+
+<div class="mirror-frame">
+  <div class="mirror-bg"></div>
+  <div class="mirror-reflection"></div>
+  <div class="screen">
+
+    <!-- S0: IDLE -->
+    <div class="s active" id="s0">
+      <div class="idle-content">
+        <div class="idle-time" id="clock">--:--</div>
+        <div class="idle-date" id="dateDisplay">LOADING...</div>
+        <div style="margin-top: 60px;">
+          <div class="idle-hint">TAP TO BEGIN</div>
+          <div class="touch-area" onclick="goTo(1)">
+            <span class="touch-icon">⚡</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- S1: NAME/NUMBER -->
+    <div class="s" id="s1">
+      <div class="welcome-logo">
+        <div class="logo-text">SMART MIRROR</div>
+        <div class="logo-sub">TABLE 07 · FOOD COURT</div>
+      </div>
+      <label class="form-label">YOUR NAME</label>
+      <input class="mirror-input" id="nameInput" placeholder="Ankit..." maxlength="30" />
+      <label class="form-label">MOBILE NUMBER</label>
+      <input class="mirror-input" id="phoneInput" placeholder="98765 XXXXX" maxlength="10" type="tel" />
+      <button class="mirror-btn" onclick="submitInfo()">CONTINUE</button>
+      <button class="mirror-btn secondary" onclick="goTo(0)">BACK</button>
+    </div>
+
+    <!-- S2: WELCOME -->
+    <div class="s" id="s2">
+      <div class="welcome-screen">
+        <span class="welcome-emoji">👋</span>
+        <div class="welcome-msg">WELCOME BACK</div>
+        <div class="welcome-name" id="welcomeName">Ankit</div>
+        <div class="welcome-table">Table 07 · Food Court Level 3</div>
+        <div style="font-size: 13px; color: rgba(255,255,255,0.35);">Loading your experience...</div>
+        <div class="welcome-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      </div>
+    </div>
+
+    <!-- S3: RESTAURANTS -->
+    <div class="s" id="s3">
+      <div class="screen-title">SMART MIRROR</div>
+      <div class="screen-greeting" id="greetName">Hi, Ankit!</div>
+      <div class="section-header">Popular Chains</div>
+      <div class="rest-card" onclick="openMenu(0)"><div class="rest-icon" style="background:rgba(210,35,42,0.15)">🍔</div><div class="rest-info"><div class="rest-name">Burger King</div><div class="rest-tag">Burgers · Fast Food</div></div><div class="rest-arrow">›</div></div>
+      <div class="rest-card" onclick="openMenu(1)"><div class="rest-icon" style="background:rgba(0,103,177,0.15)">🍕</div><div class="rest-info"><div class="rest-name">Domino's Pizza</div><div class="rest-tag">Pizza · Italian</div></div><div class="rest-arrow">›</div></div>
+      <div class="rest-card" onclick="openMenu(2)"><div class="rest-icon" style="background:rgba(238,50,36,0.15)">🍗</div><div class="rest-info"><div class="rest-name">KFC</div><div class="rest-tag">Chicken · Fast Food</div></div><div class="rest-arrow">›</div></div>
+      <div class="section-header">Indian Favorites</div>
+      <div class="rest-card" onclick="openMenu(3)"><div class="rest-icon" style="background:rgba(255,153,0,0.15)">🍢</div><div class="rest-info"><div class="rest-name">Tunday Kababi</div><div class="rest-tag">Kebabs · Lucknow Style</div></div><div class="rest-arrow">›</div></div>
+      <div class="rest-card" onclick="openMenu(4)"><div class="rest-icon" style="background:rgba(34,160,92,0.15)">🥣</div><div class="rest-info"><div class="rest-name">Vaango</div><div class="rest-tag">South Indian · Healthy</div></div><div class="rest-arrow">›</div></div>
+      <div class="section-header">Snacks & Desserts</div>
+      <div class="rest-card" onclick="openMenu(5)"><div class="rest-icon" style="background:rgba(255,200,0,0.15)">🧇</div><div class="rest-info"><div class="rest-name">The Waffle Co</div><div class="rest-tag">Waffles · Desserts</div></div><div class="rest-arrow">›</div></div>
+      <div class="rest-card" onclick="openMenu(6)"><div class="rest-icon" style="background:rgba(255,100,0,0.15)">🥟</div><div class="rest-info"><div class="rest-name">WOW! Momo</div><div class="rest-tag">Momos · Snacks</div></div><div class="rest-arrow">›</div></div>
+    </div>
+
+    <!-- S4: MENU -->
+    <div class="s" id="s4">
+      <div class="back-btn" onclick="goTo(3)">‹ BACK</div>
+      <div class="rest-header">
+        <div class="rest-header-icon" id="menuIcon"></div>
+        <div><div class="rest-header-name" id="menuName"></div><div class="rest-header-sub" id="menuSub"></div></div>
+      </div>
+      <div id="menuItems"></div>
+      <div class="cart-bar" onclick="renderCart()" id="cartBar" style="display:none">
+        <div class="cart-info" id="cartInfo">0 items</div>
+        <div class="cart-total" id="cartTotal">View Cart ›</div>
+      </div>
+    </div>
+
+    <!-- S5: CART -->
+    <div class="s" id="s5">
+      <div class="back-btn" onclick="goTo(4)">‹ BACK</div>
+      <div class="screen-title">YOUR ORDER</div>
+      <div style="font-size:18px;font-weight:500;color:rgba(255,255,255,0.85);margin-bottom:20px">Review & Pay</div>
+      <div id="cartItemsList"></div>
+      <div class="total-row">
+        <span class="total-label">Total Amount</span>
+        <span class="total-amount" id="grandTotal">₹0</span>
+      </div>
+      <button class="pay-btn" onclick="confirmOrder()">PAY NOW · UPI / CARD</button>
+      <button class="mirror-btn secondary" style="margin-top:8px" onclick="goTo(3)">Add More Items</button>
+    </div>
+
+    <!-- S6: CONFIRMED -->
+    <div class="s" id="s6">
+      <div class="confirmed-screen">
+        <div class="check-circle">✓</div>
+        <div class="conf-title">ORDER PLACED</div>
+        <div class="conf-sub">Your food is being prepared</div>
+        <div class="conf-table">Table 07 · <span id="confName"></span></div>
+        <div class="timer-box">
+          <div class="timer-label">ESTIMATED TIME</div>
+          <div class="timer-val" id="timerDisplay">18:00</div>
+        </div>
+        <div class="ready-badge" id="readyBadge">🎉 Your order is ready! Please collect from counter.</div>
+        <button class="mirror-btn" style="margin-top:16px" onclick="resetAll()">NEW ORDER</button>
+      </div>
+    </div>
+
+  </div>
+  <div class="power-btn" onclick="goTo(0)"><div class="power-btn-dot"></div></div>
+</div>
+
+<script>
+const menus = [
+  { name:"Burger King", icon:"🍔", bg:"rgba(210,35,42,0.15)", sub:"American Fast Food", items:[
+    {n:"Whopper",d:"Flame-grilled beef patty",p:249},
+    {n:"Crispy Veg Burger",d:"Paneer & veggies",p:149},
+    {n:"Zinger Burger",d:"Spicy chicken fillet",p:199},
+    {n:"Onion Rings",d:"Crispy golden rings",p:89},
+    {n:"Chocolate Shake",d:"Rich creamy shake",p:129}
+  ]},
+  { name:"Domino's", icon:"🍕", bg:"rgba(0,103,177,0.15)", sub:"Pizza & More", items:[
+    {n:"Margherita Pizza",d:"Classic cheese & tomato",p:199},
+    {n:"Peppy Paneer",d:"Crunchy paneer & peppers",p:269},
+    {n:"Chicken Dominator",d:"Loaded with chicken",p:349},
+    {n:"Pasta Italiano",d:"White sauce pasta",p:179},
+    {n:"Choco Lava Cake",d:"Warm chocolate cake",p:89}
+  ]},
+  { name:"KFC", icon:"🍗", bg:"rgba(238,50,36,0.15)", sub:"Finger Lickin' Good", items:[
+    {n:"Original Bucket (6pc)",d:"Classic KFC chicken",p:499},
+    {n:"Zinger Burger",d:"Spicy crispy chicken",p:219},
+    {n:"Popcorn Chicken",d:"Bite-sized crispy pieces",p:149},
+    {n:"Coleslaw",d:"Fresh creamy slaw",p:59},
+    {n:"Pepsi 330ml",d:"Chilled cola",p:79}
+  ]},
+  { name:"Tunday Kababi", icon:"🍢", bg:"rgba(255,153,0,0.15)", sub:"Lucknow's Pride", items:[
+    {n:"Galouti Kebab (4pc)",d:"Melt-in-mouth mutton",p:299},
+    {n:"Seekh Kebab",d:"Spiced minced meat",p:249},
+    {n:"Ulte Tawe ka Paratha",d:"Crispy tawa paratha",p:49},
+    {n:"Nihari",d:"Slow-cooked mutton curry",p:349},
+    {n:"Sheer Khurma",d:"Festive sweet vermicelli",p:99}
+  ]},
+  { name:"Vaango", icon:"🥣", bg:"rgba(34,160,92,0.15)", sub:"South Indian", items:[
+    {n:"Masala Dosa",d:"Crispy with spiced potato",p:149},
+    {n:"Idli Sambar (3pc)",d:"Soft steamed idlis",p:99},
+    {n:"Uttapam",d:"Thick veggie pancake",p:129},
+    {n:"Filter Coffee",d:"South Indian decoction",p:79},
+    {n:"Vada Sambar",d:"Crispy medu vada",p:109}
+  ]},
+  { name:"The Waffle Co", icon:"🧇", bg:"rgba(255,200,0,0.15)", sub:"Desserts & More", items:[
+    {n:"Belgian Waffle",d:"Classic with maple syrup",p:179},
+    {n:"Nutella Waffle",d:"Hazelnut chocolate drizzle",p:219},
+    {n:"Fruit Waffle",d:"Fresh seasonal fruits",p:199},
+    {n:"Waffle Ice Cream",d:"Hot waffle + cold scoop",p:249},
+    {n:"Hot Chocolate",d:"Rich dark cocoa",p:129}
+  ]},
+  { name:"WOW! Momo", icon:"🥟", bg:"rgba(255,100,0,0.15)", sub:"Momos & Snacks", items:[
+    {n:"Steamed Veg Momo (8pc)",d:"Classic soft dumplings",p:129},
+    {n:"Fried Chicken Momo",d:"Crispy pan-fried",p:169},
+    {n:"Tandoori Momo",d:"Smoky clay oven momos",p:189},
+    {n:"Momo Soup",d:"Clear broth with momos",p:149},
+    {n:"Soya Chaap",d:"Marinated & grilled",p:159}
+  ]}
+];
+
+let cart = [], currentMenu = 0, userName = '', timerInterval = null;
+
+function goTo(n) {
+  document.querySelectorAll('.s').forEach(s => s.classList.remove('active'));
+  document.getElementById('s'+n).classList.add('active');
+}
+
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('clock').textContent = h+':'+m;
+  const days = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  document.getElementById('dateDisplay').textContent = days[now.getDay()]+', '+now.getDate()+' '+months[now.getMonth()]+' '+now.getFullYear();
+}
+updateClock(); setInterval(updateClock, 1000);
+
+function submitInfo() {
+  const name = document.getElementById('nameInput').value.trim();
+  if(!name) { document.getElementById('nameInput').focus(); return; }
+  userName = name;
+  document.getElementById('welcomeName').textContent = name;
+  document.getElementById('greetName').textContent = 'Hi, '+name+'!';
+  goTo(2);
+  setTimeout(() => goTo(3), 2200);
+}
+
+function openMenu(idx) {
+  currentMenu = idx;
+  const m = menus[idx];
+  document.getElementById('menuIcon').textContent = m.icon;
+  document.getElementById('menuIcon').style.background = m.bg;
+  document.getElementById('menuName').textContent = m.name;
+  document.getElementById('menuSub').textContent = m.sub;
+  const container = document.getElementById('menuItems');
+  container.innerHTML = '';
+  m.items.forEach((item, i) => {
+    const inCart = cart.find(c => c.rest === m.name && c.name === item.n);
+    container.innerHTML += `<div class="menu-item">
+      <div class="item-info"><div class="item-name">${item.n}</div><div class="item-desc">${item.d}</div></div>
+      <div class="item-price">₹${item.p}</div>
+      <div class="add-btn ${inCart?'added':''}" onclick="addToCart(${idx},${i})" id="btn_${idx}_${i}">${inCart?'✓':'+'}</div>
+    </div>`;
+  });
+  updateCartBar();
+  goTo(4);
+}
+
+function addToCart(rIdx, iIdx) {
+  const m = menus[rIdx];
+  const item = m.items[iIdx];
+  if(!cart.find(c => c.rest === m.name && c.name === item.n)) {
+    cart.push({ rest: m.name, name: item.n, price: item.p });
+    const btn = document.getElementById(`btn_${rIdx}_${iIdx}`);
+    if(btn) { btn.textContent = '✓'; btn.classList.add('added'); }
+  }
+  updateCartBar();
+}
+
+function updateCartBar() {
+  const bar = document.getElementById('cartBar');
+  if(cart.length === 0) { bar.style.display='none'; return; }
+  bar.style.display='flex';
+  const total = cart.reduce((s,c) => s+c.price, 0);
+  document.getElementById('cartInfo').textContent = cart.length+' item'+(cart.length>1?'s':'');
+  document.getElementById('cartTotal').textContent = '₹'+total+' · View Cart ›';
+}
+
+function renderCart() {
+  const list = document.getElementById('cartItemsList');
+  list.innerHTML = '';
+  cart.forEach(c => {
+    list.innerHTML += `<div class="cart-item"><span class="cart-item-name">${c.name} <span style="color:rgba(255,255,255,0.3);font-size:11px">· ${c.rest}</span></span><span class="cart-item-price">₹${c.price}</span></div>`;
+  });
+  document.getElementById('grandTotal').textContent = '₹'+cart.reduce((s,c)=>s+c.price,0);
+  goTo(5);
+}
+
+function confirmOrder() {
+  document.getElementById('confName').textContent = userName;
+  goTo(6);
+  let secs = 18*60;
+  if(timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    secs--;
+    const m = String(Math.floor(secs/60)).padStart(2,'0');
+    const s = String(secs%60).padStart(2,'0');
+    document.getElementById('timerDisplay').textContent = m+':'+s;
+    if(secs <= 0) {
+      clearInterval(timerInterval);
+      document.getElementById('readyBadge').classList.add('show');
+      document.getElementById('timerDisplay').textContent = 'READY!';
+    }
+  }, 1000);
+}
+
+function resetAll() {
+  cart = [];
+  if(timerInterval) clearInterval(timerInterval);
+  document.getElementById('readyBadge').classList.remove('show');
+  document.getElementById('nameInput').value='';
+  document.getElementById('phoneInput').value='';
+  goTo(0);
+}
+</script>
+</body>
+</html>
