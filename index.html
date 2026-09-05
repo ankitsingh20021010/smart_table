@@ -104,7 +104,8 @@
     .cart-item-price { font-size: 13px; color: rgba(99,179,237,0.8); font-weight: 500; }
     .total-row { display: flex; justify-content: space-between; padding: 16px 0 0; }
     .total-label { font-size: 13px; color: rgba(255,255,255,0.4); }
-    .total-amount { font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.9); }
+    .total-amount { font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.9); } 
+    
     .pay-btn { width: 100%; padding: 16px; border-radius: 12px; margin-top: 16px; background: linear-gradient(135deg, #1a5c3a, #22a05c); border: none; color: white; font-size: 15px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: opacity 0.2s; }
     .pay-btn:hover { opacity: 0.85; }
 
@@ -205,7 +206,7 @@
       <div style="font-size:18px;font-weight:500;color:rgba(255,255,255,0.85);margin-bottom:20px">Review & Pay</div>
       <div id="cartItemsList"></div>
       <div class="total-row">
-        <span class="total-label">Total Amount</span>
+        <span class="total-label">Total Amount </span>
         <span class="total-amount" id="grandTotal">₹0</span>
       </div>
       <button class="pay-btn" onclick="confirmOrder()">PAY NOW · UPI / CARD</button>
